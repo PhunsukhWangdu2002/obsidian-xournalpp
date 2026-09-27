@@ -1,13 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Menu, TFile, TFolder } from "obsidian";
 import { addXournalppOptionsToFileMenu } from "src/utils/file-menu";
-import { createAnnotatedXoppFromPdf, findCorrespondingXoppToPdf } from "src/utils/xopp-actions";
+import { createAnnotatedXoppFromPdf, findCorrespondingXoppToPdf, isAnnotatedPdfOutput } from "src/utils/xopp-actions";
 import XoppPlugin from "src/main";
 
 vi.mock("src/utils/xopp-actions", () => ({
     createAnnotatedXoppFromPdf: vi.fn(),
     deleteXoppAndPdf: vi.fn(),
     findCorrespondingXoppToPdf: vi.fn().mockReturnValue(undefined),
+    isAnnotatedPdfOutput: vi.fn().mockReturnValue(false),
     isAnnotatedXoppForPdf: vi.fn(
         (pdfPath: string, xoppPath: string) =>
             xoppPath === pdfPath.replace(/\.pdf$/i, "-annotated.xopp") ||
@@ -58,6 +59,11 @@ function createMenu(): { items: MenuItemStub[]; addItem: (callback: (item: MenuI
 }
 
 describe("PDF file menu", () => {
+    beforeEach(() => {
+        vi.mocked(isAnnotatedPdfOutput).mockReturnValue(false);
+        vi.mocked(findCorrespondingXoppToPdf).mockReturnValue(undefined);
+    });
+
     it("does not offer the PDF annotation action when the setting is disabled", () => {
         const pdfFile = new TFile("chapter.pdf", "math/chapter.pdf");
         const plugin = {
@@ -95,6 +101,20 @@ describe("PDF file menu", () => {
 
         annotateItem?.click?.();
         expect(createAnnotatedXoppFromPdf).toHaveBeenCalledWith(pdfFile, plugin);
+    });
+
+    it("does not offer annotation for an exported annotated PDF", () => {
+        const pdfFile = new TFile("chapter-annotated.pdf", "math/chapter-annotated.pdf");
+        const plugin = {
+            settings: { enablePdfAnnotation: true },
+            app: { vault: {} },
+        } as unknown as XoppPlugin;
+        const menu = createMenu();
+        vi.mocked(isAnnotatedPdfOutput).mockReturnValue(true);
+
+        addXournalppOptionsToFileMenu(menu as unknown as Menu, pdfFile, plugin);
+
+        expect(menu.items.map((item) => item.title)).not.toContain("Annotate PDF in Xournal++");
     });
 
     it("does not offer rename or delete when opening an annotation journal from the clean PDF", () => {

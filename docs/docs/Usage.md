@@ -29,7 +29,9 @@ There are several ways to open a specific file in Xournal++. First locate the co
 
 ## Annotating a PDF
 
-Enable **PDF annotation context menu** in the plugin settings. For a PDF without a corresponding `.xopp` file, right-click it in the file explorer and choose **Annotate PDF in Xournal++**. The plugin creates `<name>-annotated.xopp` in the same folder, attaches the clean PDF as its background, and opens the journal in Xournal++. The clean source PDF is preserved.
+In plugin settings, turn on **Enable PDF annotation context menu**. For a PDF without a corresponding `.xopp` file, right-click it in the file explorer and choose **Annotate PDF in Xournal++**, or open the PDF and use the command palette action **Annotate current PDF in Xournal++**. The plugin creates `<name>-annotated.xopp` in the same folder, attaches the clean PDF as its background, and opens the journal in Xournal++. The clean source PDF is preserved. If automatic export is enabled, `<name>-annotated.pdf` is created as the output and is not treated as a separate journal for that output PDF. In this flow, avoid using the `-annotated` suffix for a separate pair in the same folder as its clean source.
+
+To verify the association manually, open the clean source PDF and confirm its `X++` tag opens the annotation journal. Then open `<name>-annotated.pdf` and confirm it remains a regular PDF without the `X++` tag or Xournal++ journal actions. To verify the command palette action, use a PDF without an existing journal or annotation output, open it, and run **Xournal++: Annotate current PDF in Xournal++**.
 
 ## Renaming a Xournal++ file
 

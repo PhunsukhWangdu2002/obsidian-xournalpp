@@ -3,6 +3,7 @@ import {
     createAnnotatedXoppFromPdf,
     deleteXoppAndPdf,
     findCorrespondingXoppToPdf,
+    isAnnotatedPdfOutput,
     isAnnotatedXoppForPdf,
     openXournalppFile,
     renameXoppFile,
@@ -17,6 +18,8 @@ export function addXournalppOptionsToFileMenu(menu: Menu, file: TFile | TFolder,
         if (file.extension === "xopp") {
             addOpenInXournalppMenu(menu, file, plugin);
         } else if (file.extension === "pdf") {
+            if (isAnnotatedPdfOutput(file.path, plugin)) return;
+
             const xoppFile = findCorrespondingXoppToPdf(file.path, plugin);
             if (xoppFile) {
                 addOpenInXournalppMenu(menu, xoppFile, plugin);

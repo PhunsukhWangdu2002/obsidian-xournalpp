@@ -137,6 +137,35 @@ describe("xopp-actions", () => {
             expect(result).toBe(annotationFile);
         });
 
+        it("does not associate an annotated PDF export with the journal for its source PDF", () => {
+            const sourcePdf = new TFile("sample.pdf", "folder/sample.pdf");
+            const annotatedPdf = new TFile("sample-annotated.pdf", "folder/sample-annotated.pdf");
+            const annotationJournal = new TFile("sample-annotated.xopp", "folder/sample-annotated.xopp");
+
+            mockVault.getFileByPath.mockImplementation((path: string) => {
+                if (path === sourcePdf.path) return sourcePdf;
+                if (path === annotatedPdf.path) return annotatedPdf;
+                if (path === annotationJournal.path) return annotationJournal;
+                return undefined;
+            });
+
+            expect(findCorrespondingXoppToPdf(sourcePdf.path, mockPlugin)).toBe(annotationJournal);
+            expect(findCorrespondingXoppToPdf(annotatedPdf.path, mockPlugin)).toBeUndefined();
+        });
+
+        it("keeps an exact -annotated PDF-XOPP pair when its clean source PDF is absent", () => {
+            const pdfFile = new TFile("sample-annotated.pdf", "folder/sample-annotated.pdf");
+            const xoppFile = new TFile("sample-annotated.xopp", "folder/sample-annotated.xopp");
+
+            mockVault.getFileByPath.mockImplementation((path: string) => {
+                if (path === pdfFile.path) return pdfFile;
+                if (path === xoppFile.path) return xoppFile;
+                return undefined;
+            });
+
+            expect(findCorrespondingXoppToPdf(pdfFile.path, mockPlugin)).toBe(xoppFile);
+        });
+
         it("should prefer the regular matching journal over the annotation journal", () => {
             const pdfFile = new TFile("test.pdf", "folder/test.pdf");
             const annotationFile = new TFile("test-批注.xopp", "folder/test-批注.xopp");

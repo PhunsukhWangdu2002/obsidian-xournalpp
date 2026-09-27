@@ -31,9 +31,9 @@ If your path contains spaces, make sure to add double quotes around it (`"`).
 
 ## PDF annotation context menu
 
-- **Description**: Adds **Annotate PDF in Xournal++** to the file menu for PDFs without a corresponding Xournal++ journal.
+- **Description**: Adds **Annotate PDF in Xournal++** to the file menu and **Annotate current PDF in Xournal++** to the command palette for PDFs without a corresponding Xournal++ journal.
 - **Default**: Disabled.
-- **Result**: Creates and opens a same-folder `<name>-annotated.xopp` using Xournal++ attach mode and keeps the source PDF unchanged. When automatic export is enabled, annotations are also exported to `<name>-annotated.pdf`.
+- **Result**: Creates and opens a same-folder `<name>-annotated.xopp` using Xournal++ attach mode and keeps the source PDF unchanged. When automatic export is enabled, annotations are also exported to `<name>-annotated.pdf`, which is not treated as a separate journal pair.
 - **Requirement**: Xournal++ must support the `--attach-mode` command-line option.
 
 ### Finding the correct installation path

@@ -64,6 +64,24 @@ export function isAnnotatedXoppForPdf(pdfFilePath: string, xoppFilePath: string)
     return [getAnnotatedXoppPath(pdfFilePath), getLegacyAnnotatedXoppPath(pdfFilePath)].includes(xoppFilePath);
 }
 
+export function isAnnotatedPdfOutput(pdfFilePath: string, plugin: XoppPlugin): boolean {
+    // The annotation flow uses these suffixes for exports beside their clean source and attached journal.
+    const sourcePdfPath = pdfFilePath.replace(/(-annotated|-批注)\.pdf$/i, ".pdf");
+    if (sourcePdfPath === pdfFilePath) return false;
+
+    const sourcePdf = plugin.app.vault.getFileByPath(sourcePdfPath);
+    const journalPath = pdfFilePath.replace(/\.pdf$/i, ".xopp");
+    const journal = plugin.app.vault.getFileByPath(journalPath);
+
+    return (
+        sourcePdf instanceof TFile &&
+        sourcePdf.path === sourcePdfPath &&
+        journal instanceof TFile &&
+        journal.path === journalPath &&
+        isAnnotatedXoppForPdf(sourcePdfPath, journalPath)
+    );
+}
+
 export async function createXoppFile(plugin: XoppPlugin, newNoteName: string, selectedTemplatePath?: string) {
     const newNotePath = newNoteName.startsWith("/") ? newNoteName.slice(1) : newNoteName;
 
@@ -156,6 +174,8 @@ export async function createAnnotatedXoppFromPdf(pdfFile: TFile, plugin: XoppPlu
 }
 
 export function findCorrespondingXoppToPdf(pdfFilePath: string, plugin: XoppPlugin): TFile | undefined {
+    if (isAnnotatedPdfOutput(pdfFilePath, plugin)) return undefined;
+
     const xoppPaths = [
         pdfFilePath?.replace(/\.pdf$/i, ".xopp"),
         getAnnotatedXoppPath(pdfFilePath),
