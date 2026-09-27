@@ -83,7 +83,7 @@ describe("checkXoppSetup", () => {
         expect(result).toBe("/Applications/Xournal++.app/Contents/MacOS/xournalpp");
     });
 
-    it("should return 'error' if all paths fail to resolve", async () => {
+    it("should return null if all paths fail to resolve", async () => {
         Platform.isWin = false;
         Platform.isMacOS = false;
 
@@ -94,7 +94,7 @@ describe("checkXoppSetup", () => {
         }) as unknown as typeof spawn);
 
         const result = await checkXoppSetup(mockPlugin);
-        expect(result).toBe("error");
+        expect(result).toBeNull();
     });
 
     it("parses a quoted executable path without invoking a shell", async () => {

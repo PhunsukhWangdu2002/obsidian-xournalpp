@@ -2,7 +2,7 @@ import { Notice, Platform } from "obsidian";
 import XoppPlugin from "src/main";
 import { runXournalpp } from "../utils/xournalpp-process";
 
-export async function checkXoppSetup(plugin: XoppPlugin): Promise<string> {
+export async function checkXoppSetup(plugin: XoppPlugin): Promise<string | null> {
     const errors = [];
     const userPath = plugin.settings.xournalppPath;
     const aliasPath = "xournalpp";
@@ -49,5 +49,5 @@ export async function checkXoppSetup(plugin: XoppPlugin): Promise<string> {
 
     new Notice("Error: Xournal++ path not setup correctly. Please check docs on how to set it up.", 10000);
     errors.forEach((error) => console.error("Xournal++ Error:" + error));
-    return "error";
+    return null;
 }
