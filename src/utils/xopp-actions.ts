@@ -106,21 +106,21 @@ export async function createAnnotatedXoppFromPdf(pdfFile: TFile, plugin: XoppPlu
         return;
     }
 
-    for (const existingAnnotationPath of [annotationXoppPath, legacyAnnotationXoppPath]) {
-        if (!(await fs.exists(existingAnnotationPath))) continue;
-
-        const annotationFile = await waitForFileToBeIndexed(plugin, existingAnnotationPath);
-        if (annotationFile) {
-            await openXournalppFile(annotationFile, plugin);
-        } else {
-            new Notice("Xournal++ annotation journal exists but could not be indexed by Obsidian.");
-        }
-        return;
-    }
-
     annotationCreationsInFlight.add(pdfFile.path);
 
     try {
+        for (const existingAnnotationPath of [annotationXoppPath, legacyAnnotationXoppPath]) {
+            if (!(await fs.exists(existingAnnotationPath))) continue;
+
+            const annotationFile = await waitForFileToBeIndexed(plugin, existingAnnotationPath);
+            if (annotationFile) {
+                await openXournalppFile(annotationFile, plugin);
+            } else {
+                new Notice("Xournal++ annotation journal exists but could not be indexed by Obsidian.");
+            }
+            return;
+        }
+
         const path = await checkXoppSetup(plugin);
         if (!path || path === "error") return;
 

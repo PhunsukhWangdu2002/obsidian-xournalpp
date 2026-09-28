@@ -157,6 +157,50 @@ describe("xopp-actions", () => {
     });
 
     describe("createAnnotatedXoppFromPdf", () => {
+        it("deduplicates calls that overlap while checking the disk for an existing journal", async () => {
+            const pdfFile = new TFile("test.pdf", "folder/test.pdf");
+            const annotationPath = getAnnotatedXoppPath(pdfFile.path);
+            const annotationFile = new TFile(annotationPath.split("/").pop()!, annotationPath);
+            let created = false;
+            mockVault.getFileByPath.mockImplementation((path: string) => {
+                if (path === pdfFile.path) return pdfFile;
+                if (path === annotationPath && created) return annotationFile;
+                return undefined;
+            });
+            vi.mocked(checkXoppSetup).mockResolvedValue("xournalpp");
+
+            let releaseDiskCheck: (() => void) | undefined;
+            const diskCheck = new Promise<void>((resolve) => {
+                releaseDiskCheck = resolve;
+            });
+            let notifyDiskCheckStarted: (() => void) | undefined;
+            const diskCheckStarted = new Promise<void>((resolve) => {
+                notifyDiskCheckStarted = resolve;
+            });
+            vi.mocked(mockVault.adapter.exists).mockImplementation(async () => {
+                notifyDiskCheckStarted?.();
+                await diskCheck;
+                return false;
+            });
+
+            const spawnMock = vi.mocked(spawn);
+            spawnMock.mockImplementation(((command: string, args: string[]) => {
+                if (args.includes("--attach-mode")) created = true;
+                const child = new EventEmitter();
+                queueMicrotask(() => child.emit("close", 0));
+                return child as never;
+            }) as unknown as typeof spawn);
+
+            const first = createAnnotatedXoppFromPdf(pdfFile, mockPlugin);
+            await diskCheckStarted;
+            const second = createAnnotatedXoppFromPdf(pdfFile, mockPlugin);
+            releaseDiskCheck?.();
+            await Promise.all([first, second]);
+
+            const attachCalls = spawnMock.mock.calls.filter(([, args]) => args.includes("--attach-mode"));
+            expect(attachCalls).toHaveLength(1);
+        });
+
         it("does not start a duplicate Attach process while creation is in flight", async () => {
             const pdfFile = new TFile("test.pdf", "folder/test.pdf");
             const annotationPath = getAnnotatedXoppPath(pdfFile.path);
