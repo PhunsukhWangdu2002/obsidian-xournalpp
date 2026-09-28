@@ -1,19 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Menu, TFile, TFolder } from "obsidian";
 import { addXournalppOptionsToFileMenu } from "src/utils/file-menu";
-import { createAnnotatedXoppFromPdf, findCorrespondingXoppToPdf, isAnnotatedPdfOutput } from "src/utils/xopp-actions";
+import { createAnnotatedXoppFromPdf, findCorrespondingXoppToPdf } from "src/utils/xopp-actions";
 import XoppPlugin from "src/main";
 
 vi.mock("src/utils/xopp-actions", () => ({
     createAnnotatedXoppFromPdf: vi.fn(),
     deleteXoppAndPdf: vi.fn(),
     findCorrespondingXoppToPdf: vi.fn().mockReturnValue(undefined),
-    isAnnotatedPdfOutput: vi.fn().mockReturnValue(false),
-    isAnnotatedXoppForPdf: vi.fn(
-        (pdfPath: string, xoppPath: string) =>
-            xoppPath === pdfPath.replace(/\.pdf$/i, "-annotated.xopp") ||
-            xoppPath === pdfPath.replace(/\.pdf$/i, "-批注.xopp")
-    ),
     openXournalppFile: vi.fn(),
     renameXoppFile: vi.fn(),
 }));
@@ -60,21 +54,20 @@ function createMenu(): { items: MenuItemStub[]; addItem: (callback: (item: MenuI
 
 describe("PDF file menu", () => {
     beforeEach(() => {
-        vi.mocked(isAnnotatedPdfOutput).mockReturnValue(false);
         vi.mocked(findCorrespondingXoppToPdf).mockReturnValue(undefined);
     });
 
-    it("does not offer the PDF annotation action when the setting is disabled", () => {
+    it("offers PDF annotation by default without a feature setting", () => {
         const pdfFile = new TFile("chapter.pdf", "math/chapter.pdf");
         const plugin = {
-            settings: { enablePdfAnnotation: false },
+            settings: {},
             app: { vault: {} },
         } as unknown as XoppPlugin;
         const menu = createMenu();
 
         addXournalppOptionsToFileMenu(menu as unknown as Menu, pdfFile, plugin);
 
-        expect(menu.items.map((item) => item.title)).not.toContain("Annotate PDF in Xournal++");
+        expect(menu.items.map((item) => item.title)).toContain("Annotate PDF in Xournal++");
     });
 
     it("offers creating an attached annotation journal when the PDF has no journal", () => {
@@ -84,7 +77,7 @@ describe("PDF file menu", () => {
         pdfFile.parent = folder;
 
         const plugin = {
-            settings: { enablePdfAnnotation: true },
+            settings: {},
             app: {
                 vault: {
                     getFileByPath: vi.fn().mockReturnValue(pdfFile),
@@ -103,30 +96,35 @@ describe("PDF file menu", () => {
         expect(createAnnotatedXoppFromPdf).toHaveBeenCalledWith(pdfFile, plugin);
     });
 
-    it("does not offer annotation for an exported annotated PDF", () => {
-        const pdfFile = new TFile("chapter-annotated.pdf", "math/chapter-annotated.pdf");
+    it("offers annotation on a source PDF even when its derived journal already exists", () => {
+        const pdfFile = new TFile("chapter.pdf", "math/chapter.pdf");
         const plugin = {
-            settings: { enablePdfAnnotation: true },
+            settings: {},
             app: { vault: {} },
         } as unknown as XoppPlugin;
         const menu = createMenu();
-        vi.mocked(isAnnotatedPdfOutput).mockReturnValue(true);
+        vi.mocked(findCorrespondingXoppToPdf).mockReturnValue(undefined);
 
         addXournalppOptionsToFileMenu(menu as unknown as Menu, pdfFile, plugin);
 
-        expect(menu.items.map((item) => item.title)).not.toContain("Annotate PDF in Xournal++");
+        expect(menu.items.map((item) => item.title)).toContain("Annotate PDF in Xournal++");
     });
 
-    it("does not offer rename or delete when opening an annotation journal from the clean PDF", () => {
-        const pdfFile = new TFile("chapter.pdf", "math/chapter.pdf");
-        const annotationFile = new TFile("chapter-批注.xopp", "math/chapter-批注.xopp");
+    it("uses normal pair actions for an annotation export and its same-basename journal", () => {
+        const pdfFile = new TFile("chapter-annotated.pdf", "math/chapter-annotated.pdf");
+        const annotationFile = new TFile("chapter-annotated.xopp", "math/chapter-annotated.xopp");
         const plugin = { app: { vault: {} } } as unknown as XoppPlugin;
         const menu = createMenu();
         vi.mocked(findCorrespondingXoppToPdf).mockReturnValue(annotationFile);
 
         addXournalppOptionsToFileMenu(menu as unknown as Menu, pdfFile, plugin);
 
-        expect(menu.items.map((item) => item.title)).toEqual(["Open in Xournal++", "Update from Xournal++"]);
+        expect(menu.items.map((item) => item.title)).toEqual([
+            "Open in Xournal++",
+            "Update from Xournal++",
+            "Rename PDF & Xournal++...",
+            "Delete PDF & Xournal++",
+        ]);
     });
 
     it("keeps rename and delete for an official exact PDF-XOPP pair", () => {

@@ -56,32 +56,6 @@ function getLegacyAnnotatedXoppPath(pdfFilePath: string): string {
     return pdfFilePath.replace(/\.pdf$/i, `${LEGACY_ANNOTATED_SUFFIX}.xopp`);
 }
 
-function getLegacyAnnotatedPdfPath(pdfFilePath: string): string {
-    return pdfFilePath.replace(/\.pdf$/i, `${LEGACY_ANNOTATED_SUFFIX}.pdf`);
-}
-
-export function isAnnotatedXoppForPdf(pdfFilePath: string, xoppFilePath: string): boolean {
-    return [getAnnotatedXoppPath(pdfFilePath), getLegacyAnnotatedXoppPath(pdfFilePath)].includes(xoppFilePath);
-}
-
-export function isAnnotatedPdfOutput(pdfFilePath: string, plugin: XoppPlugin): boolean {
-    // The annotation flow uses these suffixes for exports beside their clean source and attached journal.
-    const sourcePdfPath = pdfFilePath.replace(/(-annotated|-批注)\.pdf$/i, ".pdf");
-    if (sourcePdfPath === pdfFilePath) return false;
-
-    const sourcePdf = plugin.app.vault.getFileByPath(sourcePdfPath);
-    const journalPath = pdfFilePath.replace(/\.pdf$/i, ".xopp");
-    const journal = plugin.app.vault.getFileByPath(journalPath);
-
-    return (
-        sourcePdf instanceof TFile &&
-        sourcePdf.path === sourcePdfPath &&
-        journal instanceof TFile &&
-        journal.path === journalPath &&
-        isAnnotatedXoppForPdf(sourcePdfPath, journalPath)
-    );
-}
-
 export async function createXoppFile(plugin: XoppPlugin, newNoteName: string, selectedTemplatePath?: string) {
     const newNotePath = newNoteName.startsWith("/") ? newNoteName.slice(1) : newNoteName;
 
@@ -98,26 +72,31 @@ export async function createXoppFile(plugin: XoppPlugin, newNoteName: string, se
 }
 
 export async function createAnnotatedXoppFromPdf(pdfFile: TFile, plugin: XoppPlugin): Promise<void> {
+    if (annotationCreationsInFlight.has(pdfFile.path)) {
+        new Notice("Xournal++ annotation creation is already in progress for this PDF.");
+        return;
+    }
+
     const annotationXoppPath = getAnnotatedXoppPath(pdfFile.path);
+    const existingAnnotationFile = plugin.app.vault.getFileByPath(annotationXoppPath);
+    if (existingAnnotationFile instanceof TFile && existingAnnotationFile.path === annotationXoppPath) {
+        await openXournalppFile(existingAnnotationFile, plugin);
+        return;
+    }
+
+    const legacyAnnotationXoppPath = getLegacyAnnotatedXoppPath(pdfFile.path);
+    const existingLegacyAnnotationFile = plugin.app.vault.getFileByPath(legacyAnnotationXoppPath);
+    if (
+        existingLegacyAnnotationFile instanceof TFile &&
+        existingLegacyAnnotationFile.path === legacyAnnotationXoppPath
+    ) {
+        await openXournalppFile(existingLegacyAnnotationFile, plugin);
+        return;
+    }
+
     const existingJournal = findCorrespondingXoppToPdf(pdfFile.path, plugin);
     if (existingJournal) {
         new Notice("An Xournal++ journal already exists for this PDF.");
-        return;
-    }
-
-    if (
-        plugin.app.vault.getFileByPath(annotationXoppPath) instanceof TFile ||
-        plugin.app.vault.getFileByPath(getLegacyAnnotatedXoppPath(pdfFile.path)) instanceof TFile
-    ) {
-        new Notice("An Xournal++ annotation journal already exists for this PDF.");
-        return;
-    }
-
-    if (
-        plugin.app.vault.getFileByPath(getAnnotatedPdfPath(pdfFile.path)) instanceof TFile ||
-        plugin.app.vault.getFileByPath(getLegacyAnnotatedPdfPath(pdfFile.path)) instanceof TFile
-    ) {
-        new Notice("An annotated PDF already exists for this PDF.");
         return;
     }
 
@@ -127,18 +106,15 @@ export async function createAnnotatedXoppFromPdf(pdfFile: TFile, plugin: XoppPlu
         return;
     }
 
-    if (
-        (await fs.exists(annotationXoppPath)) ||
-        (await fs.exists(getLegacyAnnotatedXoppPath(pdfFile.path))) ||
-        (await fs.exists(getAnnotatedPdfPath(pdfFile.path))) ||
-        (await fs.exists(getLegacyAnnotatedPdfPath(pdfFile.path)))
-    ) {
-        new Notice("An Xournal++ annotation output already exists for this PDF.");
-        return;
-    }
+    for (const existingAnnotationPath of [annotationXoppPath, legacyAnnotationXoppPath]) {
+        if (!(await fs.exists(existingAnnotationPath))) continue;
 
-    if (annotationCreationsInFlight.has(pdfFile.path)) {
-        new Notice("Xournal++ annotation creation is already in progress for this PDF.");
+        const annotationFile = await waitForFileToBeIndexed(plugin, existingAnnotationPath);
+        if (annotationFile) {
+            await openXournalppFile(annotationFile, plugin);
+        } else {
+            new Notice("Xournal++ annotation journal exists but could not be indexed by Obsidian.");
+        }
         return;
     }
 
@@ -174,18 +150,9 @@ export async function createAnnotatedXoppFromPdf(pdfFile: TFile, plugin: XoppPlu
 }
 
 export function findCorrespondingXoppToPdf(pdfFilePath: string, plugin: XoppPlugin): TFile | undefined {
-    if (isAnnotatedPdfOutput(pdfFilePath, plugin)) return undefined;
-
-    const xoppPaths = [
-        pdfFilePath?.replace(/\.pdf$/i, ".xopp"),
-        getAnnotatedXoppPath(pdfFilePath),
-        getLegacyAnnotatedXoppPath(pdfFilePath),
-    ];
-
-    for (const xoppPath of xoppPaths) {
-        const xoppFile = plugin.app.vault.getFileByPath(xoppPath);
-        if (xoppFile instanceof TFile && xoppFile.path === xoppPath) return xoppFile;
-    }
+    const xoppPath = pdfFilePath?.replace(/\.pdf$/i, ".xopp");
+    const xoppFile = plugin.app.vault.getFileByPath(xoppPath);
+    if (xoppFile instanceof TFile && xoppFile.path === xoppPath) return xoppFile;
 }
 
 async function waitForFileToBeIndexed(plugin: XoppPlugin, path: string, timeout = 5000): Promise<TFile | null> {

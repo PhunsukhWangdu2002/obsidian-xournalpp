@@ -120,24 +120,7 @@ describe("xopp-actions", () => {
             expect(result).toBeUndefined();
         });
 
-        it("should return the annotation journal when the regular matching journal is absent", () => {
-            const pdfFile = new TFile("test.pdf", "folder/test.pdf");
-            const annotationFile = new TFile("test-批注.xopp", "folder/test-批注.xopp");
-            const parentFolder = new TFolder("folder", "folder");
-            parentFolder.children = [pdfFile, annotationFile];
-            pdfFile.parent = parentFolder;
-
-            mockVault.getFileByPath.mockImplementation((path: string) => {
-                if (path === pdfFile.path) return pdfFile;
-                if (path === annotationFile.path) return annotationFile;
-                return undefined;
-            });
-
-            const result = findCorrespondingXoppToPdf("folder/test.pdf", mockPlugin);
-            expect(result).toBe(annotationFile);
-        });
-
-        it("does not associate an annotated PDF export with the journal for its source PDF", () => {
+        it("pairs the annotation export by its own basename without pairing it to the source PDF", () => {
             const sourcePdf = new TFile("sample.pdf", "folder/sample.pdf");
             const annotatedPdf = new TFile("sample-annotated.pdf", "folder/sample-annotated.pdf");
             const annotationJournal = new TFile("sample-annotated.xopp", "folder/sample-annotated.xopp");
@@ -149,21 +132,8 @@ describe("xopp-actions", () => {
                 return undefined;
             });
 
-            expect(findCorrespondingXoppToPdf(sourcePdf.path, mockPlugin)).toBe(annotationJournal);
-            expect(findCorrespondingXoppToPdf(annotatedPdf.path, mockPlugin)).toBeUndefined();
-        });
-
-        it("keeps an exact -annotated PDF-XOPP pair when its clean source PDF is absent", () => {
-            const pdfFile = new TFile("sample-annotated.pdf", "folder/sample-annotated.pdf");
-            const xoppFile = new TFile("sample-annotated.xopp", "folder/sample-annotated.xopp");
-
-            mockVault.getFileByPath.mockImplementation((path: string) => {
-                if (path === pdfFile.path) return pdfFile;
-                if (path === xoppFile.path) return xoppFile;
-                return undefined;
-            });
-
-            expect(findCorrespondingXoppToPdf(pdfFile.path, mockPlugin)).toBe(xoppFile);
+            expect(findCorrespondingXoppToPdf(sourcePdf.path, mockPlugin)).toBeUndefined();
+            expect(findCorrespondingXoppToPdf(annotatedPdf.path, mockPlugin)).toBe(annotationJournal);
         });
 
         it("should prefer the regular matching journal over the annotation journal", () => {
@@ -268,27 +238,37 @@ describe("xopp-actions", () => {
             });
         });
 
-        it("does not launch when the annotation output already exists on disk", async () => {
+        it("opens an existing annotation journal after it becomes indexed", async () => {
             const pdfFile = new TFile("test.pdf", "folder/test.pdf");
             const annotationPath = getAnnotatedXoppPath(pdfFile.path);
             const annotationFile = new TFile(annotationPath.split("/").pop()!, annotationPath);
-            const launched = false;
+            let indexed = false;
             const parentFolder = new TFolder("folder", "folder");
             parentFolder.children = [pdfFile];
             pdfFile.parent = parentFolder;
             mockVault.getFileByPath.mockImplementation((path: string) => {
                 if (path === pdfFile.path) return pdfFile;
-                if (path === annotationPath && launched) return annotationFile;
+                if (path === annotationPath && indexed) return annotationFile;
                 return undefined;
             });
-            mockVault.adapter.exists.mockImplementation(
-                async (path: string) => path === getAnnotatedXoppPath(pdfFile.path)
-            );
+            mockVault.adapter.exists.mockImplementation(async (path: string) => {
+                if (path !== annotationPath) return false;
+                indexed = true;
+                return true;
+            });
             vi.mocked(checkXoppSetup).mockResolvedValue("xournalpp");
+            vi.mocked(spawn).mockImplementation(((_command: string, _args: string[]) => {
+                const child = new EventEmitter();
+                queueMicrotask(() => child.emit("close", 0));
+                return child as never;
+            }) as unknown as typeof spawn);
 
             await createAnnotatedXoppFromPdf(pdfFile, mockPlugin);
 
-            expect(spawn).not.toHaveBeenCalled();
+            expect(spawn).toHaveBeenCalledTimes(1);
+            expect(spawn).toHaveBeenCalledWith("xournalpp", [`/mocked/vault/path/${annotationPath}`], {
+                shell: false,
+            });
         });
 
         it("creates and opens a same-folder attached journal with the annotation suffix", async () => {
@@ -369,36 +349,70 @@ describe("xopp-actions", () => {
             expect(spawnMock).toHaveBeenCalledTimes(2);
         });
 
-        it("does not overwrite an existing annotation journal", async () => {
-            const pdfFile = new TFile("test.pdf", "folder/test.pdf");
-            const annotationFile = new TFile("test-批注.xopp", "folder/test-批注.xopp");
-            const parentFolder = new TFolder("folder", "folder");
-            parentFolder.children = [pdfFile, annotationFile];
-            pdfFile.parent = parentFolder;
-            mockVault.getFileByPath.mockReturnValue(pdfFile);
+        it("opens the existing annotation journal on subsequent annotate actions", async () => {
+            const pdfFile = new TFile("sample.pdf", "folder/sample.pdf");
+            const annotationFile = new TFile("sample-annotated.xopp", "folder/sample-annotated.xopp");
+            mockVault.getFileByPath.mockImplementation((path: string) => {
+                if (path === pdfFile.path) return pdfFile;
+                if (path === annotationFile.path) return annotationFile;
+                return undefined;
+            });
+            vi.mocked(checkXoppSetup).mockResolvedValue("xournalpp");
+
+            const spawnMock = vi.mocked(spawn);
+            spawnMock.mockImplementation(((_command: string, _args: string[]) => {
+                const child = new EventEmitter();
+                queueMicrotask(() => child.emit("close", 0));
+                return child as never;
+            }) as unknown as typeof spawn);
 
             await createAnnotatedXoppFromPdf(pdfFile, mockPlugin);
 
-            expect(spawn).not.toHaveBeenCalled();
+            expect(spawnMock).toHaveBeenCalledTimes(1);
+            expect(spawnMock).toHaveBeenCalledWith("xournalpp", ["/mocked/vault/path/folder/sample-annotated.xopp"], {
+                shell: false,
+            });
         });
 
-        it("does not create a journal when the annotated PDF output already exists", async () => {
+        it("creates the missing journal when its same-basename PDF already exists", async () => {
             const pdfFile = new TFile("test.pdf", "folder/test.pdf");
             const annotatedPdfPath = getAnnotatedPdfPath(pdfFile.path);
             const annotatedPdfFile = new TFile("test-annotated.pdf", annotatedPdfPath);
+            const annotationXoppPath = getAnnotatedXoppPath(pdfFile.path);
+            const annotationFile = new TFile("test-annotated.xopp", annotationXoppPath);
+            let created = false;
             const parentFolder = new TFolder("folder", "folder");
             parentFolder.children = [pdfFile, annotatedPdfFile];
             pdfFile.parent = parentFolder;
             mockVault.getFileByPath.mockImplementation((path: string) => {
                 if (path === pdfFile.path) return pdfFile;
                 if (path === getAnnotatedPdfPath(pdfFile.path)) return annotatedPdfFile;
+                if (path === annotationXoppPath && created) return annotationFile;
                 return undefined;
             });
             vi.mocked(checkXoppSetup).mockResolvedValue("xournalpp");
+            vi.mocked(spawn).mockImplementation(((_command: string, args: string[]) => {
+                if (args.includes("--attach-mode")) created = true;
+                const child = new EventEmitter();
+                queueMicrotask(() => child.emit("close", 0));
+                return child as never;
+            }) as unknown as typeof spawn);
 
             await createAnnotatedXoppFromPdf(pdfFile, mockPlugin);
 
-            expect(spawn).not.toHaveBeenCalled();
+            expect(spawn).toHaveBeenNthCalledWith(
+                1,
+                "xournalpp",
+                [
+                    "--attach-mode",
+                    `--save=/mocked/vault/path/${annotationXoppPath}`,
+                    `/mocked/vault/path/${pdfFile.path}`,
+                ],
+                { shell: false }
+            );
+            expect(spawn).toHaveBeenNthCalledWith(2, "xournalpp", [`/mocked/vault/path/${annotationXoppPath}`], {
+                shell: false,
+            });
         });
     });
 

@@ -7,7 +7,6 @@ import { createRibbonIcons } from "src/utils/ribbon-icons";
 
 interface XoppPluginSettings {
     autoExport: boolean;
-    enablePdfAnnotation: boolean;
     xournalppPath: string;
     templatesFolder: string;
     defaultTemplatePath: string;
@@ -17,7 +16,6 @@ interface XoppPluginSettings {
 
 export const DEFAULT_SETTINGS: Partial<XoppPluginSettings> = {
     autoExport: false,
-    enablePdfAnnotation: false,
     xournalppPath: "",
     templatesFolder: "",
     defaultTemplatePath: "",

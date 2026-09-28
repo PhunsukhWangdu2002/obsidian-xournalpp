@@ -1,14 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TFile } from "obsidian";
 import { createCommands } from "src/core/commands";
-import { createAnnotatedXoppFromPdf, findCorrespondingXoppToPdf, isAnnotatedPdfOutput } from "src/utils/xopp-actions";
+import { createAnnotatedXoppFromPdf, findCorrespondingXoppToPdf } from "src/utils/xopp-actions";
 import XoppPlugin from "src/main";
 
 vi.mock("src/utils/xopp-actions", () => ({
     createAnnotatedXoppFromPdf: vi.fn(),
     deleteXoppAndPdf: vi.fn(),
     findCorrespondingXoppToPdf: vi.fn(),
-    isAnnotatedPdfOutput: vi.fn(),
     openXournalppFile: vi.fn(),
     renameXoppFile: vi.fn(),
 }));
@@ -32,9 +31,8 @@ describe("Xournal++ commands", () => {
         activeFile = null;
         registeredCommands = [];
         vi.mocked(findCorrespondingXoppToPdf).mockReturnValue(undefined);
-        vi.mocked(isAnnotatedPdfOutput).mockReturnValue(false);
         plugin = {
-            settings: { enablePdfAnnotation: true },
+            settings: {},
             app: { workspace: { getActiveFile: () => activeFile } },
             addCommand: (command: any) => registeredCommands.push(command),
         } as unknown as XoppPlugin;
@@ -52,9 +50,21 @@ describe("Xournal++ commands", () => {
         expect(createAnnotatedXoppFromPdf).toHaveBeenCalledWith(pdfFile, plugin);
     });
 
-    it("hides the annotation action when PDF annotation is disabled", () => {
+    it("keeps annotation available for a source PDF with an existing derived journal", () => {
         activeFile = new TFile("chapter.pdf", "math/chapter.pdf");
-        plugin.settings.enablePdfAnnotation = false;
+
+        createCommands(plugin);
+
+        const command = registeredCommands.find(({ id }) => id === "annotate-pdf-in-xournalpp");
+        expect(command?.checkCallback(true)).toBe(true);
+    });
+
+    it("does not expose annotation for a PDF already paired with its same-basename journal", () => {
+        const pdfFile = new TFile("chapter-annotated.pdf", "math/chapter-annotated.pdf");
+        activeFile = pdfFile;
+        vi.mocked(findCorrespondingXoppToPdf).mockReturnValue(
+            new TFile("chapter-annotated.xopp", "math/chapter-annotated.xopp")
+        );
 
         createCommands(plugin);
 

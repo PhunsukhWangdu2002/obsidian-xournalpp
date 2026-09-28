@@ -3,8 +3,6 @@ import {
     createAnnotatedXoppFromPdf,
     deleteXoppAndPdf,
     findCorrespondingXoppToPdf,
-    isAnnotatedPdfOutput,
-    isAnnotatedXoppForPdf,
     openXournalppFile,
     renameXoppFile,
 } from "./xopp-actions";
@@ -18,18 +16,13 @@ export function addXournalppOptionsToFileMenu(menu: Menu, file: TFile | TFolder,
         if (file.extension === "xopp") {
             addOpenInXournalppMenu(menu, file, plugin);
         } else if (file.extension === "pdf") {
-            if (isAnnotatedPdfOutput(file.path, plugin)) return;
-
             const xoppFile = findCorrespondingXoppToPdf(file.path, plugin);
             if (xoppFile) {
                 addOpenInXournalppMenu(menu, xoppFile, plugin);
-                const isAnnotationJournal = isAnnotatedXoppForPdf(file.path, xoppFile.path);
-                if (!isAnnotationJournal) {
-                    addXournalppRenameMenu(menu, file, xoppFile, plugin);
-                    addXournalppDeleteMenu(menu, file, xoppFile, plugin);
-                    removeDeleteRenameMenuItem();
-                }
-            } else if (plugin.settings.enablePdfAnnotation) {
+                addXournalppRenameMenu(menu, file, xoppFile, plugin);
+                addXournalppDeleteMenu(menu, file, xoppFile, plugin);
+                removeDeleteRenameMenuItem();
+            } else {
                 addAnnotatePdfMenu(menu, file, plugin);
             }
         }

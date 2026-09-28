@@ -3,7 +3,6 @@ import {
     createAnnotatedXoppFromPdf,
     deleteXoppAndPdf,
     findCorrespondingXoppToPdf,
-    isAnnotatedPdfOutput,
     openXournalppFile,
     renameXoppFile,
 } from "../utils/xopp-actions";
@@ -22,8 +21,6 @@ export function createCommands(plugin: XoppPlugin) {
             if (
                 !(pdfFile instanceof TFile) ||
                 pdfFile.extension !== "pdf" ||
-                !plugin.settings.enablePdfAnnotation ||
-                isAnnotatedPdfOutput(pdfFile.path, plugin) ||
                 findCorrespondingXoppToPdf(pdfFile.path, plugin)
             ) {
                 return false;

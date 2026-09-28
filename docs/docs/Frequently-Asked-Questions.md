@@ -6,9 +6,9 @@ sidebar_position: 5
 
 ### How can I annotate a PDF?
 
-In plugin settings, turn on **Enable PDF annotation context menu**. Then right-click a PDF that does not already have a corresponding `.xopp` file and choose **Annotate PDF in Xournal++**, or open it and run **Xournal++: Annotate current PDF in Xournal++** from the command palette.
+For an eligible PDF, right-click it and choose **Annotate PDF in Xournal++**, or open it and run **Xournal++: Annotate current PDF in Xournal++** from the command palette. The action stays available on the source PDF even after its annotation journal exists.
 
-The plugin creates `<name>-annotated.xopp` beside the clean source PDF, opens it with Xournal++ attach mode, and exports the handwritten annotations to `<name>-annotated.pdf`. The source PDF is never overwritten, and the exported PDF is not treated as a separate journal pair. The action is disabled by default and requires a Xournal++ version that supports `--attach-mode`.
+The first action creates `<name>-annotated.xopp` beside the source PDF with Xournal++ attach mode; later actions open that journal. The source PDF remains an ordinary PDF, while `<name>-annotated.xopp` and the exported `<name>-annotated.pdf` use normal same-basename association. Xournal++ must support `--attach-mode`.
 
 ### I have questions, issues, or ideas regarding the plugin, how can I get in touch?
 
