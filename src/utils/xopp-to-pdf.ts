@@ -1,11 +1,8 @@
 import { FileSystemAdapter, Notice } from "obsidian";
-import { exec } from "child_process";
-import { rename, unlink } from "fs/promises";
+import { join } from "path";
 import XoppPlugin from "src/main";
 import { checkXoppSetup } from "../core/environment-checks";
-import { promisify } from "util";
-
-const execPromise = promisify(exec);
+import { runXournalpp } from "./xournalpp-process";
 
 const activeExports = new Set<string>();
 const pendingExports = new Set<string>();
@@ -17,7 +14,7 @@ export async function exportXoppToPDF(plugin: XoppPlugin, filePaths: Array<strin
     }
 
     const path = await checkXoppSetup(plugin);
-    if (!path || path === "error") {
+    if (!path) {
         new Notice("Error: Xournal++ path not setup correctly. Please check docs on how to set it up.", 10000);
         return;
     }
@@ -44,10 +41,12 @@ export async function exportXoppToPDF(plugin: XoppPlugin, filePaths: Array<strin
     for (let i = 0; i < pathsToProcess.length; i += concurrencyLimit) {
         const batch = pathsToProcess.slice(i, i + concurrencyLimit);
         const batchPromises = batch.map(async (filePath) => {
-            const xoppFilePath = vaultPath + "/" + filePath;
+            const xoppFilePath = join(vaultPath, ...filePath.split("/"));
             const pdfFilePath = xoppFilePath.replace(/\.xopp$/i, ".pdf");
             const tempPdfFilePath = `${pdfFilePath}.tmp`;
-            const command = `${path} --create-pdf="${tempPdfFilePath}" "${xoppFilePath}"`;
+
+            const pdfVaultPath = filePath.replace(/\.xopp$/i, ".pdf");
+            const tempPdfVaultPath = `${pdfVaultPath}.tmp`;
 
             const maxRetries = 3;
             let success = false;
@@ -55,13 +54,13 @@ export async function exportXoppToPDF(plugin: XoppPlugin, filePaths: Array<strin
 
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
                 try {
-                    await execPromise(command);
-                    await rename(tempPdfFilePath, pdfFilePath).catch(() => {});
+                    await runXournalpp(path, [`--create-pdf=${tempPdfFilePath}`, xoppFilePath]);
+                    await fs.rename(tempPdfVaultPath, pdfVaultPath).catch(() => {});
                     success = true;
                     break;
                 } catch (error) {
                     lastError = error;
-                    await unlink(tempPdfFilePath).catch(() => {});
+                    await fs.remove(tempPdfVaultPath).catch(() => {});
                     if (attempt < maxRetries) {
                         await new Promise((resolve) => window.setTimeout(resolve, 500));
                     }
