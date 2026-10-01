@@ -15,10 +15,15 @@ import XoppPlugin from "src/main";
 import { spawn } from "child_process";
 import { checkXoppSetup } from "src/core/environment-checks";
 import { TFile, TFolder, DataAdapter, FileSystemAdapter } from "obsidian";
+import { join } from "path";
 
 vi.mock("src/core/environment-checks", () => ({
     checkXoppSetup: vi.fn(),
 }));
+
+// The plugin builds absolute paths with `path.join`, which yields backslashes on Windows.
+const absoluteVaultPath = (vaultRelativePath: string) =>
+    join(new FileSystemAdapter().getBasePath(), ...vaultRelativePath.split("/"));
 
 describe("xopp-actions", () => {
     let mockPlugin: XoppPlugin;
@@ -274,10 +279,10 @@ describe("xopp-actions", () => {
             expect(spawnMock).toHaveBeenNthCalledWith(
                 1,
                 "xournalpp",
-                ["--attach-mode", `--save=/mocked/vault/path/${annotationPath}`, `/mocked/vault/path/${pdfFile.path}`],
+                ["--attach-mode", `--save=${absoluteVaultPath(annotationPath)}`, absoluteVaultPath(pdfFile.path)],
                 { shell: false }
             );
-            expect(spawnMock).toHaveBeenNthCalledWith(2, "xournalpp", [`/mocked/vault/path/${annotationPath}`], {
+            expect(spawnMock).toHaveBeenNthCalledWith(2, "xournalpp", [absoluteVaultPath(annotationPath)], {
                 shell: false,
             });
         });
@@ -310,7 +315,7 @@ describe("xopp-actions", () => {
             await createAnnotatedXoppFromPdf(pdfFile, mockPlugin);
 
             expect(spawn).toHaveBeenCalledTimes(1);
-            expect(spawn).toHaveBeenCalledWith("xournalpp", [`/mocked/vault/path/${annotationPath}`], {
+            expect(spawn).toHaveBeenCalledWith("xournalpp", [absoluteVaultPath(annotationPath)], {
                 shell: false,
             });
         });
@@ -341,15 +346,12 @@ describe("xopp-actions", () => {
             expect(spawnMock).toHaveBeenNthCalledWith(
                 1,
                 "xournalpp",
-                ["--attach-mode", `--save=/mocked/vault/path/${annotationPath}`, "/mocked/vault/path/folder/test.pdf"],
+                ["--attach-mode", `--save=${absoluteVaultPath(annotationPath)}`, absoluteVaultPath(pdfFile.path)],
                 { shell: false }
             );
-            expect(spawnMock).toHaveBeenNthCalledWith(
-                2,
-                "xournalpp",
-                ["/mocked/vault/path/folder/test-annotated.xopp"],
-                { shell: false }
-            );
+            expect(spawnMock).toHaveBeenNthCalledWith(2, "xournalpp", [absoluteVaultPath(annotationPath)], {
+                shell: false,
+            });
             expect(spawnMock).toHaveBeenCalledTimes(2);
         });
 
@@ -413,7 +415,7 @@ describe("xopp-actions", () => {
             await createAnnotatedXoppFromPdf(pdfFile, mockPlugin);
 
             expect(spawnMock).toHaveBeenCalledTimes(1);
-            expect(spawnMock).toHaveBeenCalledWith("xournalpp", ["/mocked/vault/path/folder/sample-annotated.xopp"], {
+            expect(spawnMock).toHaveBeenCalledWith("xournalpp", [absoluteVaultPath(annotationFile.path)], {
                 shell: false,
             });
         });
@@ -447,14 +449,10 @@ describe("xopp-actions", () => {
             expect(spawn).toHaveBeenNthCalledWith(
                 1,
                 "xournalpp",
-                [
-                    "--attach-mode",
-                    `--save=/mocked/vault/path/${annotationXoppPath}`,
-                    `/mocked/vault/path/${pdfFile.path}`,
-                ],
+                ["--attach-mode", `--save=${absoluteVaultPath(annotationXoppPath)}`, absoluteVaultPath(pdfFile.path)],
                 { shell: false }
             );
-            expect(spawn).toHaveBeenNthCalledWith(2, "xournalpp", [`/mocked/vault/path/${annotationXoppPath}`], {
+            expect(spawn).toHaveBeenNthCalledWith(2, "xournalpp", [absoluteVaultPath(annotationXoppPath)], {
                 shell: false,
             });
         });

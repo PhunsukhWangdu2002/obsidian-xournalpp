@@ -5,10 +5,20 @@ import { checkXoppSetup } from "src/core/environment-checks";
 import { spawn } from "child_process";
 import * as obsidian from "obsidian";
 import XoppPlugin from "src/main";
+import { join } from "path";
 
 vi.mock("src/core/environment-checks", () => ({
     checkXoppSetup: vi.fn(),
 }));
+
+// The plugin builds absolute paths with `path.join`, which yields backslashes on Windows.
+const absoluteVaultPath = (vaultRelativePath: string) =>
+    join(new obsidian.FileSystemAdapter().getBasePath(), ...vaultRelativePath.split("/"));
+
+const conversionArgs = (vaultRelativePath: string) => {
+    const xoppAbsolutePath = absoluteVaultPath(vaultRelativePath);
+    return [`--create-pdf=${xoppAbsolutePath.replace(/\.xopp$/i, ".pdf")}.tmp`, xoppAbsolutePath];
+};
 
 describe("xopp-to-pdf", () => {
     let mockPlugin: XoppPlugin;
@@ -69,11 +79,7 @@ describe("xopp-to-pdf", () => {
 
         await exportXoppToPDF(mockPlugin, ["notes/lecture.xopp"]);
 
-        expect(spawn).toHaveBeenCalledWith(
-            "xournalpp",
-            ["--create-pdf=/mocked/vault/path/notes/lecture.pdf.tmp", "/mocked/vault/path/notes/lecture.xopp"],
-            { shell: false }
-        );
+        expect(spawn).toHaveBeenCalledWith("xournalpp", conversionArgs("notes/lecture.xopp"), { shell: false });
         expect(noticeSpy).toHaveBeenCalledWith("Exported all Xournal++ notes successfully.");
     });
 
@@ -133,16 +139,8 @@ describe("xopp-to-pdf", () => {
         await exportAllXoppToPDF(mockPlugin);
 
         expect(spawn).toHaveBeenCalledTimes(2);
-        expect(spawn).toHaveBeenCalledWith(
-            "xournalpp",
-            ["--create-pdf=/mocked/vault/path/note1.pdf.tmp", "/mocked/vault/path/note1.xopp"],
-            { shell: false }
-        );
-        expect(spawn).toHaveBeenCalledWith(
-            "xournalpp",
-            ["--create-pdf=/mocked/vault/path/folder/note3.pdf.tmp", "/mocked/vault/path/folder/note3.xopp"],
-            { shell: false }
-        );
+        expect(spawn).toHaveBeenCalledWith("xournalpp", conversionArgs("note1.xopp"), { shell: false });
+        expect(spawn).toHaveBeenCalledWith("xournalpp", conversionArgs("folder/note3.xopp"), { shell: false });
         expect(noticeSpy).toHaveBeenCalledWith("Exported all Xournal++ notes successfully.");
     });
 });
